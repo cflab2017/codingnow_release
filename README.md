@@ -22,6 +22,7 @@ Windows 작업 스케줄러보다 훨씬 단순하게, **한 화면에서 표로
 - **다운로드**: [GuiAppsController-Setup-1.5.1.exe](GuiAppsController/GuiAppsController-Setup-1.5.1.exe)
 - **소스 코드**: [github.com/cflab2017/GUI_Apps_Controler](https://github.com/cflab2017/GUI_Apps_Controler)
 - **사용법**: [상세 가이드 보기](GuiAppsController/blog.md)
+- **인터랙티브 데모**: [브라우저에서 미리보기](https://htmlpreview.github.io/?https://github.com/cflab2017/codingnow_release/blob/main/GuiAppsController/demo.html) · [HTML 소스](GuiAppsController/demo.html)
 
 **주요 기능**
 - 매일 / 매주(요일 선택) / 1회 일정 — 클릭 두 번이면 등록·편집·삭제

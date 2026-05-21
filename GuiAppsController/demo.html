@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GUI Apps Controller — 실행 데모</title>
+<style>
+  :root {
+    --chrome-bg: #2b6fb2;
+    --chrome-fg: #ffffff;
+    --bar-bg: #f1f3f5;
+    --bar-border: #d1d6db;
+    --row-active-bg: #dcefdc;
+    --row-active-bg-anim: #b8e0b8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --success: #1f7a1f;
+    --danger: #c1172e;
+    --link: #2563eb;
+    --highlight: #ffd84d;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, #eef2f7 0%, #dbe5f1 100%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 16px 64px;
+  }
+  .lede {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .lede h1 {
+    font-size: 24px;
+    margin: 0 0 6px;
+  }
+  .lede p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* ---- fake app window ---- */
+  .window {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 14px 40px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+  }
+  .chrome {
+    display: flex;
+    align-items: center;
+    background: var(--chrome-bg);
+    color: var(--chrome-fg);
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+  }
+  .chrome .icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #3a98e0;
+    margin-right: 8px;
+    box-shadow: inset 0 0 0 2px #ffffff66;
+  }
+  .chrome .title { flex: 1; }
+  .chrome .controls span {
+    display: inline-block;
+    width: 28px;
+    text-align: center;
+    cursor: default;
+    opacity: 0.85;
+    font-family: "Segoe UI Symbol", sans-serif;
+  }
+  .chrome .controls .close:hover { background: #e74c3c; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--bar-bg);
+    border-bottom: 1px solid var(--bar-border);
+    padding: 4px 6px;
+    gap: 2px;
+    font-size: 13px;
+  }
+  .toolbar button {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    padding: 4px 10px;
+    border-radius: 3px;
+    cursor: default;
+    font-size: 13px;
+    font-family: inherit;
+    transition: background 120ms, border-color 120ms, box-shadow 200ms;
+  }
+  .toolbar button:hover { background: #e7eaee; }
+  .toolbar button.sep {
+    margin: 0 4px;
+    border-left: 1px solid var(--bar-border);
+    padding: 0;
+    width: 0;
+    height: 18px;
+  }
+  .toolbar button.pulse {
+    background: var(--highlight);
+    border-color: #d4a012;
+    box-shadow: 0 0 0 4px rgba(255, 216, 77, 0.35);
+    animation: pulse 700ms ease-in-out infinite alternate;
+  }
+  @keyframes pulse {
+    from { box-shadow: 0 0 0 0 rgba(255, 216, 77, 0.55); }
+    to   { box-shadow: 0 0 0 8px rgba(255, 216, 77, 0.12); }
+  }
+
+  .searchbar {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--bar-border);
+    background: #ffffff;
+  }
+  .searchbar input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #c8cdd3;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #ffffff;
+    color: var(--text);
+  }
+  .searchbar input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    background: #fafbfc;
+    color: var(--text);
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--bar-border);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f3f5;
+    vertical-align: middle;
+  }
+  tbody tr {
+    transition: background 250ms, opacity 250ms;
+  }
+  tbody tr.active   { background: var(--row-active-bg); }
+  tbody tr.firing   { background: var(--row-active-bg-anim); }
+  tbody tr.hidden   { display: none; }
+  td.muted  { color: var(--muted); }
+  td.success { color: var(--success); font-weight: 600; white-space: nowrap; }
+  td.fail    { color: var(--danger);  font-weight: 600; white-space: nowrap; }
+
+  .statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8f9fa;
+    border-top: 1px solid var(--bar-border);
+    padding: 5px 12px;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 26px;
+  }
+  .statusbar .msg { transition: opacity 200ms; }
+  .statusbar .msg.show { color: var(--text); }
+  .statusbar .warn { color: var(--danger); }
+
+  /* ---- tray balloon ---- */
+  .balloon {
+    position: absolute;
+    top: 60px;
+    right: 16px;
+    width: 280px;
+    background: #ffffff;
+    border: 1px solid #c8cdd3;
+    border-left: 4px solid #2b6fb2;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    opacity: 0;
+    transform: translateX(8px);
+    pointer-events: none;
+    transition: opacity 250ms, transform 250ms;
+  }
+  .balloon.show { opacity: 1; transform: translateX(0); }
+  .balloon .ttl {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .balloon .ttl::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+  .balloon.crit { border-left-color: var(--danger); }
+  .balloon.crit .ttl::before { background: var(--danger); }
+
+  /* ---- history modal ---- */
+  .modal-bg {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 30, 50, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 250ms;
+  }
+  .modal-bg.show { opacity: 1; }
+  .modal {
+    background: #ffffff;
+    border-radius: 8px;
+    width: 560px;
+    max-width: 92%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    transform: translateY(12px);
+    transition: transform 250ms;
+    overflow: hidden;
+  }
+  .modal-bg.show .modal { transform: translateY(0); }
+  .modal h3 {
+    margin: 0;
+    padding: 12px 16px;
+    background: var(--chrome-bg);
+    color: white;
+    font-size: 14px;
+  }
+  .modal table { font-size: 12px; }
+  .modal td { padding: 6px 10px; border-bottom: 1px solid #f1f3f5; }
+  .modal .ts { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .modal .row-fail { color: var(--danger); }
+  .modal .row-ok   { color: var(--success); }
+
+  /* ---- controls ---- */
+  .controls-row {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+  .controls-row button {
+    background: var(--chrome-bg);
+    color: #ffffff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 120ms, transform 80ms;
+  }
+  .controls-row button:hover { background: #245d96; }
+  .controls-row button:active { transform: translateY(1px); }
+  .controls-row button.ghost {
+    background: transparent;
+    color: var(--chrome-bg);
+    border: 1px solid var(--chrome-bg);
+  }
+  .controls-row button.ghost:hover { background: #e8eef6; }
+
+  .step-indicator {
+    margin-top: 10px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    min-height: 18px;
+  }
+
+  /* ---- caption row underneath ---- */
+  .caption {
+    text-align: center;
+    margin-top: 32px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .caption a { color: var(--link); text-decoration: none; }
+  .caption a:hover { text-decoration: underline; }
+
+  /* ---- play overlay before first run ---- */
+  .play-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 30, 50, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    transition: opacity 300ms;
+  }
+  .play-overlay.hidden { opacity: 0; pointer-events: none; }
+  .play-overlay .play-btn {
+    background: #ffffff;
+    color: var(--chrome-bg);
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+    font-size: 28px;
+    font-weight: 700;
+    transition: transform 200ms;
+  }
+  .play-overlay:hover .play-btn { transform: scale(1.05); }
+  .play-overlay .play-btn::before { content: "▶"; margin-left: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="lede">
+    <h1>GUI Apps Controller — 실행 데모</h1>
+    <p>실제 동작이 자동으로 반복 재생됩니다. (약 15초 / 무한 루프)</p>
+  </div>
+
+  <div class="window" id="window">
+    <!-- chrome -->
+    <div class="chrome">
+      <span class="icon"></span>
+      <span class="title">GUI 앱 컨트롤러</span>
+      <span class="controls">
+        <span>—</span><span>□</span><span class="close">✕</span>
+      </span>
+    </div>
+
+    <!-- toolbar -->
+    <div class="toolbar">
+      <button data-btn="add">추가</button>
+      <button data-btn="edit">편집</button>
+      <button data-btn="remove">삭제</button>
+      <button data-btn="toggle">활성/비활성 전환</button>
+      <button data-btn="run-now" id="btn-run-now">지금 실행</button>
+      <button data-btn="dup">복제</button>
+      <span class="sep"></span>
+      <button data-btn="history" id="btn-history">히스토리</button>
+      <button data-btn="import">가져오기</button>
+      <button data-btn="export">내보내기</button>
+      <button data-btn="settings">설정</button>
+      <button data-btn="bot">봇 명령 목록</button>
+      <button data-btn="quit">종료</button>
+    </div>
+
+    <!-- search -->
+    <div class="searchbar">
+      <input id="search" placeholder="이름 또는 경로로 검색..." autocomplete="off" readonly>
+    </div>
+
+    <!-- table -->
+    <table>
+      <thead>
+        <tr>
+          <th>이름</th>
+          <th>경로</th>
+          <th>일정</th>
+          <th>다음 실행</th>
+          <th>활성</th>
+          <th>마지막 실행</th>
+          <th>종료 코드</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr id="row-calc">
+          <td>Calculator (example)</td>
+          <td>C:\WINDOWS\system32\calc.exe</td>
+          <td>매일 09:00</td>
+          <td class="muted">-</td>
+          <td>아니오</td>
+          <td class="muted">-</td>
+          <td class="muted">-</td>
+        </tr>
+        <tr id="row-kiwoom" class="active">
+          <td>kiwoomStart</td>
+          <td>C:/Works/autoStock-ai/kiwoomStart.bat</td>
+          <td>월,화,수,목,금 08:00</td>
+          <td id="kiwoom-next">2026-05-22 08:00</td>
+          <td>예</td>
+          <td id="kiwoom-last">2026-05-21 08:00</td>
+          <td class="success">✓ 성공</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- statusbar -->
+    <div class="statusbar">
+      <span class="msg" id="status">준비</span>
+      <span class="warn" id="warning"></span>
+    </div>
+
+    <!-- balloon -->
+    <div class="balloon" id="balloon">
+      <div class="ttl" id="balloon-ttl">실행됨</div>
+      <div id="balloon-body">kiwoomStart 시작됨.</div>
+    </div>
+
+    <!-- history modal -->
+    <div class="modal-bg" id="modal">
+      <div class="modal">
+        <h3>실행 히스토리</h3>
+        <table>
+          <tbody>
+            <tr><td class="ts">2026-05-21 08:00:03</td><td>kiwoomStart</td><td class="row-ok">실행됨</td><td class="ts">—</td></tr>
+            <tr><td class="ts">2026-05-21 08:00:01</td><td>kiwoomStart</td><td class="row-ok">시작됨</td><td class="ts">pid 18244</td></tr>
+            <tr><td class="ts">2026-05-20 08:00:02</td><td>kiwoomStart</td><td class="row-ok">시작됨</td><td class="ts">pid 17312</td></tr>
+            <tr><td class="ts">2026-05-19 08:00:01</td><td>kiwoomStart</td><td class="row-ok">시작됨</td><td class="ts">pid 16980</td></tr>
+            <tr><td class="ts">2026-05-18 08:00:00</td><td>kiwoomStart</td><td class="row-ok">시작됨</td><td class="ts">pid 15602</td></tr>
+            <tr><td class="ts">2026-05-15 08:00:42</td><td>kiwoomStart</td><td class="row-fail">실패 — not found</td><td class="ts">—</td></tr>
+            <tr><td class="ts">2026-05-14 08:00:00</td><td>kiwoomStart</td><td class="row-ok">시작됨</td><td class="ts">pid 14108</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- initial play overlay -->
+    <div class="play-overlay" id="playOverlay">
+      <div class="play-btn" aria-label="재생"></div>
+    </div>
+  </div>
+
+  <div class="step-indicator" id="step"></div>
+
+  <div class="caption">
+    이 데모는 정적 HTML/CSS/JS로 만든 시연이며, 실제 앱은
+    <a href="https://github.com/cflab2017/GUI_Apps_Controler">GitHub 저장소</a>에서 받을 수 있습니다.
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  const btn = (key) => document.querySelector(`[data-btn="${key}"]`);
+  const stepBox = $('step');
+  const status = $('status');
+  const balloon = $('balloon');
+  const modal = $('modal');
+  const search = $('search');
+  const rowCalc = $('row-calc');
+  const rowKiwoom = $('row-kiwoom');
+
+  function pulse(key, on=true) {
+    const el = btn(key);
+    if (!el) return;
+    el.classList.toggle('pulse', on);
+  }
+
+  function setStatus(text, kind='') {
+    status.textContent = text;
+    status.classList.toggle('show', Boolean(text));
+    status.classList.toggle('warn', kind === 'warn');
+  }
+
+  function showBalloon(title, body, critical=false) {
+    $('balloon-ttl').textContent = title;
+    $('balloon-body').textContent = body;
+    balloon.classList.toggle('crit', critical);
+    balloon.classList.add('show');
+  }
+  function hideBalloon() { balloon.classList.remove('show'); }
+
+  function setStep(n, label) {
+    stepBox.textContent = label ? `Step ${n} — ${label}` : '';
+  }
+
+  async function typeInto(el, text, perChar=70) {
+    el.value = '';
+    for (const ch of text) {
+      el.value += ch;
+      await sleep(perChar);
+    }
+  }
+  async function backspaceFrom(el, perChar=40) {
+    while (el.value.length) {
+      el.value = el.value.slice(0, -1);
+      await sleep(perChar);
+    }
+  }
+
+  function applyFilter(needle) {
+    needle = (needle || '').trim().toLowerCase();
+    [rowCalc, rowKiwoom].forEach(row => {
+      const text = row.textContent.toLowerCase();
+      const match = !needle || text.includes(needle);
+      row.classList.toggle('hidden', !match);
+    });
+  }
+
+  function resetUI() {
+    pulse('run-now', false);
+    pulse('history', false);
+    setStatus('준비');
+    hideBalloon();
+    modal.classList.remove('show');
+    search.value = '';
+    applyFilter('');
+    rowKiwoom.classList.remove('firing');
+    $('kiwoom-next').textContent = '2026-05-22 08:00';
+    $('kiwoom-last').textContent = '2026-05-21 08:00';
+    setStep(0, '');
+  }
+
+  async function runSequence() {
+    resetUI();
+    $('playOverlay').classList.add('hidden');
+
+    // Step 1 — highlight Run Now
+    setStep(1, '"지금 실행"으로 즉시 동작 확인');
+    await sleep(700);
+    pulse('run-now', true);
+    await sleep(1200);
+    pulse('run-now', false);
+
+    // Step 2 — fire row, status + balloon
+    rowKiwoom.classList.add('firing');
+    setStatus('kiwoomStart 시작됨.');
+    showBalloon('실행됨', 'kiwoomStart 시작됨.');
+    // Update last run to "지금"
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2,'0');
+    $('kiwoom-last').textContent =
+      `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    await sleep(2500);
+    hideBalloon();
+    rowKiwoom.classList.remove('firing');
+    await sleep(400);
+
+    // Step 3 — search
+    setStep(2, '검색으로 빠르게 필터링');
+    search.removeAttribute('readonly');
+    search.focus();
+    await sleep(400);
+    await typeInto(search, 'calc', 90);
+    applyFilter('calc');
+    await sleep(1400);
+
+    // Step 4 — clear search
+    setStep(3, '검색 해제 — 전체 보기');
+    await backspaceFrom(search, 40);
+    applyFilter('');
+    search.setAttribute('readonly', '');
+    search.blur();
+    await sleep(700);
+
+    // Step 5 — open history
+    setStep(4, '히스토리에서 최근 실행 내역 확인');
+    pulse('history', true);
+    await sleep(900);
+    pulse('history', false);
+    modal.classList.add('show');
+    await sleep(3000);
+    modal.classList.remove('show');
+    await sleep(400);
+
+    // Done
+    setStep(0, '');
+    setStatus('준비');
+  }
+
+  async function loopForever() {
+    // Tiny initial pause so users see the idle state before anything moves.
+    await sleep(900);
+    while (true) {
+      await runSequence();
+      // Breather between loops so it doesn't feel frantic.
+      await sleep(1800);
+    }
+  }
+
+  // Skip the initial overlay if user clicks; sequence is already running.
+  $('playOverlay').addEventListener('click', () => $('playOverlay').classList.add('hidden'));
+
+  // Kick off the infinite loop.
+  loopForever();
+})();
+</script>
+</body>
+</html>
